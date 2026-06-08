@@ -1,0 +1,7 @@
+fastapi==0.110.0
+uvicorn==0.28.0
+pydantic==2.6.4
+redis==5.0.3
+requests==2.31.0
+google-cloud-secret-manager==2.19.0
+google-cloud-bigquery==3.18.0

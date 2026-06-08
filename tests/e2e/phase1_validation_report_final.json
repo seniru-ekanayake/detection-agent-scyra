@@ -1,0 +1,51 @@
+{
+  "project_id": "scyra-agents-495519",
+  "dataset": "easm_attack_surface",
+  "test_domain": "testfire.net",
+  "run_at": "2026-06-04T20:11:31.382374Z",
+  "results": {
+    "test_1_completeness": {
+      "status": "pass",
+      "coverage_percent": 100.0,
+      "found": 8,
+      "truth": 8
+    },
+    "test_2_partial_failure": {
+      "status": "pass",
+      "scan_status": "partial",
+      "error_logged": true,
+      "access_restored": true
+    },
+    "test_3_delta_detection": {
+      "status": "pass",
+      "new_asset_detected": true,
+      "gone_after_3_absences": true,
+      "active_after_2_absences": true,
+      "ip_rotation_property_only": true
+    },
+    "test_4_audit_trail": {
+      "status": "pass",
+      "log_entries_found": 7,
+      "missing_entries": 0,
+      "null_violations": 0
+    },
+    "test_5_multi_tenant": {
+      "status": "pass",
+      "tenant_a_assets": 8,
+      "tenant_b_assets": 8,
+      "cross_tenant_leak": false,
+      "rls_enforced": true
+    },
+    "test_6_quota_protection": {
+      "status": "pass",
+      "pre_cached_ips": 5,
+      "redundant_api_calls": 0,
+      "cache_skipped_correctly": true
+    }
+  },
+  "overall": {
+    "passed": 6,
+    "failed": 0,
+    "ready_for_phase_2": true
+  }
+}

@@ -1,0 +1,104 @@
+Creating temporary archive of 3 file(s) totalling 3.0 KiB before compression.
+Uploading tarball of [.] to [gs://scyra-agents-495519_cloudbuild/source/1780482262.359707-2a5742661add4c44976332be680b4506.tgz]
+Created [https://cloudbuild.googleapis.com/v1/projects/scyra-agents-495519/locations/global/builds/34f952c5-cd57-437d-9fa5-d11f0164d2db].
+Logs are available at [ https://console.cloud.google.com/cloud-build/builds/34f952c5-cd57-437d-9fa5-d11f0164d2db?project=114999731000 ].
+Waiting for build to complete. Polling interval: 1 second(s).
+ERROR: (gcloud.builds.submit) HttpError accessing <https://cloudbuild.googleapis.com/v1/projects/scyra-agents-495519/locations/global/builds/34f952c5-cd57-437d-9fa5-d11f0164d2db?alt=json>: response: <{'vary': 'Origin, X-Origin, Referer', 'content-type': 'application/json; charset=UTF-8', 'content-encoding': 'gzip', 'date': 'Wed, 03 Jun 2026 10:25:14 GMT', 'server': 'ESF', 'x-xss-protection': '0', 'x-frame-options': 'SAMEORIGIN', 'x-content-type-options': 'nosniff', 'alt-svc': 'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000', 'transfer-encoding': 'chunked', 'status': 429}>, content <{
+  "error": {
+    "code": 429,
+    "message": "Quota exceeded for quota metric 'Build and Operation Get requests' and limit 'Build and Operation Get requests per minute' of service 'cloudbuild.googleapis.com' for consumer 'project_number:114999731000'.",
+    "status": "RESOURCE_EXHAUSTED",
+    "details": [
+      {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        "reason": "RATE_LIMIT_EXCEEDED",
+        "domain": "googleapis.com",
+        "metadata": {
+          "service": "cloudbuild.googleapis.com",
+          "consumer": "projects/114999731000",
+          "quota_metric": "cloudbuild.googleapis.com/get_requests",
+          "quota_limit": "GetRequestsPerMinutePerProject",
+          "quota_location": "global",
+          "quota_unit": "1/min/{project}",
+          "quota_limit_value": "60"
+        }
+      },
+      {
+        "@type": "type.googleapis.com/google.rpc.Help",
+        "links": [
+          {
+            "description": "Request a higher quota limit.",
+            "url": "https://cloud.google.com/docs/quotas/help/request_increase"
+          }
+        ]
+      }
+    ]
+  }
+}
+>
+This may be due to network connectivity issues. Please check your network settings, and the status of the service you are trying to reach.
+----------------------------- REMOTE BUILD OUTPUT ------------------------------
+starting build "34f952c5-cd57-437d-9fa5-d11f0164d2db"
+
+FETCHSOURCE
+Fetching storage object: gs://scyra-agents-495519_cloudbuild/source/1780482262.359707-2a5742661add4c44976332be680b4506.tgz#1780482263157952
+Copying gs://scyra-agents-495519_cloudbuild/source/1780482262.359707-2a5742661add4c44976332be680b4506.tgz#1780482263157952...
+/ [0 files][    0.0 B/  1.6 KiB]                                                / [1 files][  1.6 KiB/  1.6 KiB]                                                
+Operation completed over 1 objects/1.6 KiB.                                      
+BUILD
+Already have image (with digest): gcr.io/cloud-builders/gcb-internal
+Sending build context to Docker daemon  6.144kB
+Step 1/11 : FROM golang:1.21-alpine AS builder
+1.21-alpine: Pulling from library/golang
+c6a83fedfae6: Pulling fs layer
+41db7493d1c6: Pulling fs layer
+54bf7053e2d9: Pulling fs layer
+4579008f8500: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+4f4fb700ef54: Verifying Checksum
+4f4fb700ef54: Download complete
+c6a83fedfae6: Verifying Checksum
+c6a83fedfae6: Download complete
+4579008f8500: Verifying Checksum
+4579008f8500: Download complete
+41db7493d1c6: Verifying Checksum
+41db7493d1c6: Download complete
+c6a83fedfae6: Pull complete
+41db7493d1c6: Pull complete
+54bf7053e2d9: Verifying Checksum
+54bf7053e2d9: Download complete
+54bf7053e2d9: Pull complete
+4579008f8500: Pull complete
+4f4fb700ef54: Pull complete
+Digest: sha256:2414035b086e3c42b99654c8b26e6f5b1b1598080d65fd03c7f499552ff4dc94
+Status: Downloaded newer image for golang:1.21-alpine
+ ---> c2321c7cf721
+Step 2/11 : RUN apk add --no-cache git
+ ---> Running in 91c44b16b48c
+fetch https://dl-cdn.alpinelinux.org/alpine/v3.20/main/x86_64/APKINDEX.tar.gz
+fetch https://dl-cdn.alpinelinux.org/alpine/v3.20/community/x86_64/APKINDEX.tar.gz
+(1/12) Installing brotli-libs (1.1.0-r2)
+(2/12) Installing c-ares (1.33.1-r0)
+(3/12) Installing libunistring (1.2-r0)
+(4/12) Installing libidn2 (2.3.7-r0)
+(5/12) Installing nghttp2-libs (1.62.1-r0)
+(6/12) Installing libpsl (0.21.5-r1)
+(7/12) Installing zstd-libs (1.5.6-r0)
+(8/12) Installing libcurl (8.14.1-r2)
+(9/12) Installing libexpat (2.7.5-r0)
+(10/12) Installing pcre2 (10.43-r0)
+(11/12) Installing git (2.45.4-r0)
+(12/12) Installing git-init-template (2.45.4-r0)
+Executing busybox-1.36.1-r29.trigger
+OK: 20 MiB in 27 packages
+Removing intermediate container 91c44b16b48c
+ ---> 461e0fec17f3
+Step 3/11 : RUN go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+ ---> Running in ec20ffe69ed6
+[91mgo: downloading github.com/projectdiscovery/subfinder/v2 v2.14.0
+[0m[91mgo: downloading github.com/projectdiscovery/subfinder v2.8.0+incompatible
+[0m[91mgo: github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest: github.com/projectdiscovery/subfinder/v2@v2.14.0 requires go >= 1.24.0 (running go 1.21.13; GOTOOLCHAIN=local)
+The command '/bin/sh -c go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest' returned a non-zero code: 1
+ERROR
+ERROR: build step 0 "gcr.io/cloud-builders/gcb-internal" failed: step exited with non-zero status: 1
+[0m

@@ -1,0 +1,25 @@
+# Python caches
+__pycache__/
+*.pyc
+
+# Local ADK files
+.adk/
+session.db
+.adk*
+
+# Terraform state and credentials
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform.lock.hcl
+
+# Local env configs
+.env
+
+# Test logs & temp files
+*.log
+*.json.resolved*
+.tempmediaStorage/
+*report.json
+services/analyzer_agent_service/

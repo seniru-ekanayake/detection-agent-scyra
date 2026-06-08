@@ -1,0 +1,80 @@
+name: Build and Deploy EASM Microservices
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: scyra-agents-495519
+  REGION: us-central1
+  REPOSITORY: easm-services
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    # Add permissions for WIF if used
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          # Supports both WIF and Service Account Key fallbacks
+          # If WIF is configured, set workload_identity_provider and service_account
+          # If SA key is used, set credentials_json via secrets
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          # workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          # service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and Deploy Services
+        run: |
+          SERVICES=(
+            "scope-profiler:easm-scope-profiler"
+            "subfinder-service:easm-subfinder-service"
+            "dnsx-service:easm-dnsx-service"
+            "crtsh-service:easm-crtsh-service"
+            "exposure-service:easm-exposure-service"
+            "httpx-service:easm-httpx-service"
+            "bigquery-writer:easm-bigquery-writer"
+            "delta-engine:easm-delta-engine"
+          )
+          
+          for item in "${SERVICES[@]}"; do
+            DIR="${item%%:*}"
+            RUN_SERVICE="${item##*:}"
+            
+            IMAGE_URI="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${RUN_SERVICE}:latest"
+            
+            echo "========================================="
+            echo "Building and deploying ${RUN_SERVICE} from services/${DIR}"
+            echo "========================================="
+            
+            # Build and push the container image
+            docker build -t ${IMAGE_URI} ./services/${DIR}
+            docker push ${IMAGE_URI}
+            
+            # Deploy to Cloud Run (only updates the image, preserves env/secrets)
+            gcloud run deploy ${RUN_SERVICE} \
+              --image=${IMAGE_URI} \
+              --region=${{ env.REGION }} \
+              --platform=managed \
+              --quiet
+          done

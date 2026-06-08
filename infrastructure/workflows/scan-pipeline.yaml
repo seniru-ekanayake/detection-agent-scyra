@@ -1,0 +1,368 @@
+main:
+  params: [input]
+  steps:
+    - init_scan:
+        assign:
+          - customer_id: ${input.customer_id}
+          - seed: ${input.seed}
+          - scan_id: ${uuid.generate()}
+          - scope_profiler_url: "https://easm-scope-profiler-114999731000.us-central1.run.app"
+          - subfinder_url: "https://easm-subfinder-service-114999731000.us-central1.run.app"
+          - dnsx_url: "https://easm-dnsx-service-114999731000.us-central1.run.app"
+          - crtsh_url: "https://easm-crtsh-service-114999731000.us-central1.run.app"
+          - exposure_url: "https://easm-exposure-service-114999731000.us-central1.run.app"
+          - httpx_url: "https://easm-httpx-service-114999731000.us-central1.run.app"
+          - bq_writer_url: "https://easm-bigquery-writer-114999731000.us-central1.run.app"
+          - delta_engine_url: "https://easm-delta-engine-114999731000.us-central1.run.app"
+          - discovered_domains: []
+          - resolved_ips: []
+          - active_hosts: []
+          - failed_functions: []
+          - functions_run: []
+          - is_subfinder_eligible: false
+
+    - register_scan:
+        call: http.post
+        args:
+          url: ${bq_writer_url + "/write/scans"}
+          auth:
+            type: OIDC
+          body:
+            rows:
+              - scan_id: ${scan_id}
+                customer_id: ${customer_id}
+                status: "running"
+                seed: ${seed}
+
+    - classify_seeds:
+        try:
+          call: http.post
+          args:
+            url: ${scope_profiler_url + "/classify"}
+            auth:
+              type: OIDC
+            body:
+              customer_id: ${customer_id}
+              seed: ${seed}
+          result: scope_result
+        except:
+          as: scope_error
+          steps:
+            - record_scope_failure:
+                assign:
+                  - failed_functions: ${list.concat(failed_functions, ["scope-profiler"])}
+                  - scope_result:
+                      body:
+                        tier: "B" # Fallback tier
+
+    - record_scope_run:
+        assign:
+          - functions_run: ${list.concat(functions_run, ["scope-profiler"])}
+          - tier: ${scope_result.body.tier}
+
+    - passive_discovery:
+        parallel:
+          shared: [discovered_domains, failed_functions, functions_run, is_subfinder_eligible]
+          branches:
+            - run_subfinder:
+                steps:
+                  - check_subfinder_eligibility:
+                      switch:
+                        - condition: ${tier == "A" or tier == "B"}
+                          assign:
+                            - is_subfinder_eligible: true
+                  - execute_subfinder:
+                      switch:
+                        - condition: ${is_subfinder_eligible}
+                          next: call_subfinder
+                      next: end_subfinder
+                  - call_subfinder:
+                      try:
+                        steps:
+                          - do_subfinder:
+                              call: http.post
+                              args:
+                                url: ${subfinder_url + "/discover"}
+                                auth:
+                                  type: OIDC
+                                body:
+                                  customer_id: ${customer_id}
+                                  domains: ${seed.domains}
+                                  scan_id: ${scan_id}
+                              result: subfinder_res
+                          - save_subfinder_domains:
+                              assign:
+                                - discovered_domains: ${list.concat(discovered_domains, subfinder_res.body.subdomains)}
+                          - record_subfinder_run:
+                              assign:
+                                - functions_run: ${list.concat(functions_run, ["subfinder-service"])}
+                      except:
+                        as: subfinder_error
+                        steps:
+                          - record_subfinder_failure:
+                              assign:
+                                - failed_functions: ${list.concat(failed_functions, ["subfinder-service"])}
+                                - functions_run: ${list.concat(functions_run, ["subfinder-service"])}
+                  - end_subfinder:
+                      assign:
+                        - temp: null
+            - run_crtsh:
+                steps:
+                  - call_crtsh:
+                      try:
+                        steps:
+                          - do_crtsh:
+                              call: http.post
+                              args:
+                                url: ${crtsh_url + "/discover"}
+                                auth:
+                                  type: OIDC
+                                body:
+                                  customer_id: ${customer_id}
+                                  domains: ${seed.domains}
+                                  scan_id: ${scan_id}
+                              result: crtsh_res
+                          - save_crtsh_domains:
+                              assign:
+                                - discovered_domains: ${list.concat(discovered_domains, crtsh_res.body.subdomains)}
+                          - record_crtsh_run:
+                              assign:
+                                - functions_run: ${list.concat(functions_run, ["crtsh-service"])}
+                      except:
+                        as: crtsh_error
+                        steps:
+                          - record_crtsh_failure:
+                              assign:
+                                  - failed_functions: ${list.concat(failed_functions, ["crtsh-service"])}
+                                  - functions_run: ${list.concat(functions_run, ["crtsh-service"])}
+
+    - resolve_domains:
+        try:
+          steps:
+            - do_dnsx:
+                call: http.post
+                args:
+                  url: ${dnsx_url + "/resolve"}
+                  auth:
+                    type: OIDC
+                  body:
+                    customer_id: ${customer_id}
+                    domains: ${list.concat(seed.domains, discovered_domains)}
+                    scan_id: ${scan_id}
+                result: dnsx_res
+            - save_resolved:
+                assign:
+                  - resolved_ips: ${dnsx_res.body.ips}
+                  - active_hosts: ${dnsx_res.body.hosts}
+                  - functions_run: ${list.concat(functions_run, ["dnsx-service"])}
+        except:
+          as: dnsx_error
+          steps:
+            - record_dnsx_failure:
+                assign:
+                  - failed_functions: ${list.concat(failed_functions, ["dnsx-service"])}
+                  - functions_run: ${list.concat(functions_run, ["dnsx-service"])}
+
+    - run_censys:
+        try:
+          steps:
+            - do_censys:
+                call: http.post
+                args:
+                  url: ${exposure_url + "/scan"}
+                  auth:
+                    type: OIDC
+                  body:
+                    customer_id: ${customer_id}
+                    ips: ${resolved_ips}
+                    scan_id: ${scan_id}
+                result: censys_res
+            - write_censys_results:
+                call: http.post
+                args:
+                  url: ${bq_writer_url + "/write"}
+                  auth:
+                    type: OIDC
+                  body:
+                    customer_id: ${customer_id}
+                    scan_id: ${scan_id}
+                    tool_name: "censys"
+                    results: ${censys_res.body.findings}
+                    function_name: "exposure-service"
+                    tool_version: ${censys_res.body.tool_version}
+                    duration_ms: ${censys_res.body.duration_ms}
+                    invoked_at: ${censys_res.body.started_at}
+                    error: ${censys_res.body.error}
+            - record_censys_run:
+                assign:
+                  - functions_run: ${list.concat(functions_run, ["exposure-service"])}
+        except:
+          as: censys_error
+          steps:
+            - record_censys_failure:
+                assign:
+                  - failed_functions: ${list.concat(failed_functions, ["exposure-service"])}
+                  - functions_run: ${list.concat(functions_run, ["exposure-service"])}
+            - log_censys_failure_to_bq:
+                call: http.post
+                args:
+                  url: ${bq_writer_url + "/write/scan_tool_log"}
+                  auth:
+                    type: OIDC
+                  body:
+                    rows:
+                      - log_id: ${uuid.generate()}
+                        scan_id: ${scan_id}
+                        customer_id: ${customer_id}
+                        tool_name: "censys"
+                        status: "FAILED"
+                        raw_output: ${censys_error.message}
+                        function_name: "exposure-service"
+                        invoked_at: ${time.format(sys.now())}
+                        error: ${censys_error.message}
+
+    - run_httpx:
+        try:
+          steps:
+            - do_httpx:
+                call: http.post
+                args:
+                  url: ${httpx_url + "/scan"}
+                  auth:
+                    type: OIDC
+                  body:
+                    customer_id: ${customer_id}
+                    hosts: ${active_hosts}
+                    scan_id: ${scan_id}
+                result: httpx_res
+            - write_httpx_results:
+                call: http.post
+                args:
+                  url: ${bq_writer_url + "/write"}
+                  auth:
+                    type: OIDC
+                  body:
+                    customer_id: ${customer_id}
+                    scan_id: ${scan_id}
+                    tool_name: "httpx"
+                    results: ${httpx_res.body.findings}
+                    function_name: "httpx-service"
+                    tool_version: ${httpx_res.body.tool_version}
+                    duration_ms: ${httpx_res.body.duration_ms}
+                    invoked_at: ${httpx_res.body.started_at}
+                    error: ${httpx_res.body.error}
+            - record_httpx_run:
+                assign:
+                  - functions_run: ${list.concat(functions_run, ["httpx-service"])}
+        except:
+          as: httpx_error
+          steps:
+            - record_httpx_failure:
+                assign:
+                  - failed_functions: ${list.concat(failed_functions, ["httpx-service"])}
+                  - functions_run: ${list.concat(functions_run, ["httpx-service"])}
+            - log_httpx_failure_to_bq:
+                call: http.post
+                args:
+                  url: ${bq_writer_url + "/write/scan_tool_log"}
+                  auth:
+                    type: OIDC
+                  body:
+                    rows:
+                      - log_id: ${uuid.generate()}
+                        scan_id: ${scan_id}
+                        customer_id: ${customer_id}
+                        tool_name: "httpx"
+                        status: "FAILED"
+                        raw_output: ${httpx_error.message}
+                        function_name: "httpx-service"
+                        invoked_at: ${time.format(sys.now())}
+                        error: ${httpx_error.message}
+
+    - run_delta_engine:
+        try:
+          steps:
+            - do_delta:
+                call: http.post
+                args:
+                  url: ${delta_engine_url + "/calculate"}
+                  auth:
+                    type: OIDC
+                  body:
+                    customer_id: ${customer_id}
+                    scan_id: ${scan_id}
+                result: delta_res
+            - record_delta_run:
+                assign:
+                  - functions_run: ${list.concat(functions_run, ["delta-engine"])}
+        except:
+          as: delta_error
+          steps:
+            - record_delta_failure:
+                assign:
+                  - failed_functions: ${list.concat(failed_functions, ["delta-engine"])}
+                  - functions_run: ${list.concat(functions_run, ["delta-engine"])}
+                  - delta_res:
+                      body:
+                        alerts: []
+
+    - check_alerts:
+        switch:
+          - condition: ${len(delta_res.body.alerts) > 0}
+            next: send_alerts
+        next: update_final_status
+        
+    - send_alerts:
+        try:
+          call: http.post
+          args:
+            url: "https://pubsub.googleapis.com/v1/projects/scyra-agents-495519/topics/easm-scan-alerts:publish"
+            auth:
+              type: OAuth2
+            body:
+              messages:
+                - data: ${base64.encode(json.encode(delta_res.body.alerts))}
+        except:
+          as: alert_error
+          steps:
+            - record_alert_failure:
+                assign:
+                  - failed_functions: ${list.concat(failed_functions, ["alert-publisher"])}
+
+    - update_final_status:
+        assign:
+          - final_status: "completed"
+          - attempted_count: ${len(functions_run)}
+          - failed_count: ${len(failed_functions)}
+    - check_failures:
+        switch:
+          - condition: ${failed_count == 0}
+            assign:
+              - final_status: "completed"
+          - condition: ${failed_count > 0 and failed_count < attempted_count}
+            assign:
+              - final_status: "partial"
+          - condition: ${failed_count >= attempted_count}
+            assign:
+              - final_status: "failed"
+    - write_final_scan_record:
+        call: http.post
+        args:
+          url: ${bq_writer_url + "/write/scans"}
+          auth:
+            type: OIDC
+          body:
+            rows:
+              - scan_id: ${scan_id}
+                customer_id: ${customer_id}
+                status: ${final_status}
+                functions_run: ${functions_run}
+                functions_failed: ${failed_functions}
+
+    - complete_scan:
+        return:
+          status: ${final_status}
+          scan_id: ${scan_id}
+          customer_id: ${customer_id}
+          functions_failed: ${failed_functions}
+          functions_run: ${functions_run}

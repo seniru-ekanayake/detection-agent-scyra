@@ -1,0 +1,35 @@
+[
+  {
+    "customer_id": "manual-customer",
+    "hostname": "demo.testfire.net",
+    "owner_team": "platform-team",
+    "data_classification": "pii",
+    "business_criticality": "high",
+    "known_third_party": false,
+    "known_false_positive": false,
+    "notes": "Phase 2 test seed - demo.testfire.net",
+    "last_updated": "2026-06-05T00:00:00Z"
+  },
+  {
+    "customer_id": "manual-customer",
+    "hostname": "www.testfire.net",
+    "owner_team": "web-team",
+    "data_classification": "public",
+    "business_criticality": "medium",
+    "known_third_party": false,
+    "known_false_positive": false,
+    "notes": "Phase 2 test seed - www.testfire.net",
+    "last_updated": "2026-06-05T00:00:00Z"
+  },
+  {
+    "customer_id": "manual-customer",
+    "hostname": "admin.testfire.net",
+    "owner_team": "platform-team",
+    "data_classification": "restricted",
+    "business_criticality": "critical",
+    "known_third_party": false,
+    "known_false_positive": false,
+    "notes": "Phase 2 test seed - admin.testfire.net",
+    "last_updated": "2026-06-05T00:00:00Z"
+  }
+]

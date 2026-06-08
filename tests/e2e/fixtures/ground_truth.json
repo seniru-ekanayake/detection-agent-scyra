@@ -1,0 +1,24 @@
+{
+  "testfire.net": {
+    "known_subdomains": [
+      "altoro.testfire.net",
+      "demo.testfire.net",
+      "demo2.testfire.net",
+      "evil.testfire.net",
+      "ftp.testfire.net",
+      "localhost.testfire.net",
+      "testfire.net",
+      "www.testfire.net"
+    ],
+    "source": "automated_preflight",
+    "generated_at": "2026-06-04T08:45:09.363692Z",
+    "generation_method": "crtsh+subfinder+amass+hackertarget+dns_verified",
+    "counts": {
+      "crtsh": 1,
+      "subfinder": 7,
+      "amass": 9,
+      "hackertarget": 3,
+      "after_dedup_and_dns": 8
+    }
+  }
+}
